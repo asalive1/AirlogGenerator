@@ -11,7 +11,7 @@ namespace AirlogGenerator.Services
 
         private readonly ConcurrentQueue<string> _buffer = new();
 
-        private string? _currentLogFile;
+        private string _currentLogFile;
         private DateTime _currentLogDate;
         private bool _wroteVersionHeaderToday = false;
 
@@ -116,7 +116,7 @@ namespace AirlogGenerator.Services
             string header =
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [INFO] [SYSTEM] AirlogGenerator version {version} starting.";
 
-            File.AppendAllText(_currentLogFile!, header + Environment.NewLine);
+            File.AppendAllText(_currentLogFile, header + Environment.NewLine);
             OnNewLogLine?.Invoke(header);
         }
 

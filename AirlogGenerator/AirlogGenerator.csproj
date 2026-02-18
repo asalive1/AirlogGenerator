@@ -4,8 +4,6 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ApplicationIcon>AG.ico</ApplicationIcon>
-
     <!-- Versioning -->
     <AssemblyVersion>1.0.4.0</AssemblyVersion>
     <FileVersion>1.0.6.1</FileVersion>

@@ -156,12 +156,18 @@ static void ExtractEmbeddedWwwroot(string targetDir, LogService? log)
         var filePath = Path.Combine(targetDir, relative.Replace('.', Path.DirectorySeparatorChar));
 
         var dir = Path.GetDirectoryName(filePath);
-        if (!Directory.Exists(dir))
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
         if (!File.Exists(filePath))
         {
             using var stream = asm.GetManifestResourceStream(res);
+            if (stream is null)
+            {
+                log?.Info("INIT", $"Skipped missing embedded resource stream: {res}");
+                continue;
+            }
+
             using var fs = File.Create(filePath);
             stream.CopyTo(fs);
 
@@ -177,9 +183,6 @@ builder.Services.AddHttpClient();
 builder.Services.AddRouting();
 builder.Services.AddHostedService<SchedulerService>();
 
-var tempProvider = builder.Services.BuildServiceProvider();
-var tempLog = tempProvider.GetService<LogService>();
-
 // Log version info
 var asm = Assembly.GetEntryAssembly();
 
@@ -187,13 +190,12 @@ var info = asm?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.Inf
 var file = asm?.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version;
 var assembly = asm?.GetName().Version?.ToString();
 
-tempLog?.Info("SYSTEM", $"Version Info ? Informational: {info}, File: {file}, Assembly: {assembly}");
-
-InitializeAppEnvironment(appRoot, tempLog);
-
 var app = builder.Build();
-app.UseDefaultFiles();
-app.UseStaticFiles();
+var startupLog = app.Services.GetRequiredService<LogService>();
+
+startupLog.Info("SYSTEM", $"Version Info ? Informational: {info}, File: {file}, Assembly: {assembly}");
+
+InitializeAppEnvironment(appRoot, startupLog);
 
 // Log active ports
 var addresses = app.Urls;
@@ -420,7 +422,7 @@ app.MapPost("/api/stations/{name}", async (
         return Results.BadRequest("Invalid station config");
     }
 
-    // NEW — enforce host ALWAYS
+    // NEW ï¿½ enforce host ALWAYS
     if (string.IsNullOrWhiteSpace(cfg.Host))
     {
         // Pull from system.json
@@ -448,7 +450,7 @@ app.MapPost("/api/ondemand", async (
     DatabaseService db) =>
 {
     log.Info("ONDEMAND",
-        $"Request for {req.Station} – {req.Dates.Count} date(s) – {req.Destination}");
+        $"Request for {req.Station} ï¿½ {req.Dates.Count} date(s) ï¿½ {req.Destination}");
 
     string destPath = Path.IsPathRooted(req.Destination)
         ? req.Destination
@@ -728,7 +730,7 @@ async Task<(string FileName, List<string> Lines)?> GenerateAirLogForDateAsync(
             // Line 2: media asset (actual played cut)
             lines.Add(AirLogProcessor.FormatAirLine(corrected, rows[i + 1]));
 
-            i++; // Skip the next row — already processed
+            i++; // Skip the next row ï¿½ already processed
         }
         else
         {
@@ -748,7 +750,7 @@ async Task<(string FileName, List<string> Lines)?> GenerateAirLogForDateAsync(
     return (fileName, lines);
 }
 
-if (cfgForRuntime.EnableWebUi)
+if (initialConfig.EnableWebUi)
 {
     app.Run();
 }
