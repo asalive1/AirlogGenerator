@@ -3,6 +3,7 @@ const supportsFolderPicker = false;
 const browserInfo = navigator.userAgent;
 
 let currentLogLevel = "DEBUG"; // default until system.json loads
+let systemConfigCache = null;
 
 appendLog(`[INFO] Browser detected: ${browserInfo}`);
 if (!supportsFolderPicker) {
@@ -26,6 +27,7 @@ function mapQueryType(num) {
         case 2: return "withRotIDonly";
         case 3: return "withRotMAID";
         case 4: return "withRotandMAID";
+        case 5: return "RotatorMAIDpid";
         default: return "Standard";
     }
 }
@@ -105,6 +107,7 @@ async function loadSystemConfig() {
     try {
         const res = await fetch("/api/system");
         const cfg = await res.json();
+        systemConfigCache = cfg;
 
         document.getElementById("sys-webport").value = cfg.webPort;
         document.getElementById("sys-scheduler-interval").value = cfg.schedulerIntervalMinutes;
@@ -124,9 +127,18 @@ async function loadSystemConfig() {
 }
 
 async function saveSystemConfig() {
+    const cached = systemConfigCache ?? {};
+
     const cfg = {
+        enableWebUi: cached.enableWebUi ?? true,
         webPort: parseInt(document.getElementById("sys-webport").value),
         defaultServerIp: document.getElementById("server-ip").value,
+        defaultServerHost: cached.defaultServerHost ?? "",
+        defaultDatabaseName: cached.defaultDatabaseName ?? "woar_server",
+        defaultServerUser: cached.defaultServerUser ?? "",
+        defaultServerPassword: cached.defaultServerPassword ?? "",
+        defaultServerPasswordSecret: cached.defaultServerPasswordSecret ?? "",
+        defaultServerPasswordSecretRegion: cached.defaultServerPasswordSecretRegion ?? "",
         schedulerIntervalMinutes: parseInt(document.getElementById("sys-scheduler-interval").value),
         logging: {
             level: document.getElementById("sys-log-level").value,
@@ -145,6 +157,7 @@ async function saveSystemConfig() {
         const result = await res.json();
 
         if (result.success) {
+            systemConfigCache = cfg;
             showSuccess("System settings saved");
             //appendLog("[SUCCESS] System settings saved.");
         } else {
@@ -306,6 +319,7 @@ function renderStationEditor(cfg) {
             <option value="withRotIDonly">Rotator Only</option>
             <option value="withRotMAID">Rotator + MAID</option>
             <option value="withRotandMAID">Rotator + Partner ID</option>
+            <option value="RotatorMAIDpid">Rotator + MAID + Partner ID</option>
         </select>
     </div>
 
@@ -1011,6 +1025,7 @@ function renderSchedule(list) {
                     <option value="2" ${entry.queryType === 2 ? "selected" : ""}>Rotator Only</option>
                     <option value="3" ${entry.queryType === 3 ? "selected" : ""}>Rotator + MAID</option>
                     <option value="4" ${entry.queryType === 4 ? "selected" : ""}>Rotator + Partner ID</option>
+                    <option value="5" ${entry.queryType === 5 ? "selected" : ""}>Rotator + MAID + Partner ID</option>
                 </select>
             </div>
         `;

@@ -123,5 +123,29 @@ namespace AirlogGenerator.Database
       AND status IN ('COMPLETED', 'SKIPPED', 'FAILED', 'STOPPED')
     ORDER BY air_date, air_time;
 ";
+
+                // Rotator + Cart + PartnerID
+                // Returns rotator fields and media asset fields, with partner ID for artist replacement on media line.
+                public const string RawAirLogQuery_RotatorPlusCartPartnerId = @"
+        SELECT
+                air_date,
+                air_time,
+                status,
+                playlist_entry_cart_name,
+                playlist_entry_category_name,
+                playlist_entry_title,
+                playlist_entry_artist,
+                media_asset_cart_name,
+                media_asset_category_name,
+                media_asset_title,
+                playlist_entry_partner_id,
+                media_asset_length,
+                original_scheduled_time
+        FROM air_log_entry
+        WHERE radio_station_name = @station
+            AND air_date BETWEEN @startDate AND @endDate
+            AND status IN ('COMPLETED', 'SKIPPED', 'FAILED', 'STOPPED')
+        ORDER BY air_date, air_time;
+";
     }
 }

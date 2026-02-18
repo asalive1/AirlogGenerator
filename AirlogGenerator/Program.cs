@@ -123,6 +123,12 @@ static void EnsureDefaultSystemJson(string path)
     {
         WebPort = 8030,
         DefaultServerIp = "127.0.0.1",
+        DefaultServerHost = "",
+        DefaultDatabaseName = "woar_server",
+        DefaultServerUser = "",
+        DefaultServerPassword = "",
+        DefaultServerPasswordSecret = "",
+        DefaultServerPasswordSecretRegion = "",
         SchedulerIntervalMinutes = 1,
         Logging = new LoggingConfig
         {
@@ -345,6 +351,9 @@ app.MapPost("/api/system", async (HttpRequest req, SystemConfigService svc, LogS
     using var reader = new StreamReader(req.Body);
     var jsonBody = await reader.ReadToEndAsync();
 
+    using var jsonDoc = JsonDocument.Parse(jsonBody);
+    var root = jsonDoc.RootElement;
+
     var updated = JsonSerializer.Deserialize<SystemConfig>(jsonBody, new JsonSerializerOptions
     {
         PropertyNameCaseInsensitive = true
@@ -352,6 +361,26 @@ app.MapPost("/api/system", async (HttpRequest req, SystemConfigService svc, LogS
 
     if (updated == null)
         return Results.BadRequest("Invalid system.json");
+
+    var current = svc.Load();
+
+    if (!root.TryGetProperty("defaultServerHost", out _))
+        updated.DefaultServerHost = current.DefaultServerHost;
+
+    if (!root.TryGetProperty("defaultDatabaseName", out _))
+        updated.DefaultDatabaseName = current.DefaultDatabaseName;
+
+    if (!root.TryGetProperty("defaultServerUser", out _))
+        updated.DefaultServerUser = current.DefaultServerUser;
+
+    if (!root.TryGetProperty("defaultServerPassword", out _))
+        updated.DefaultServerPassword = current.DefaultServerPassword;
+
+    if (!root.TryGetProperty("defaultServerPasswordSecret", out _))
+        updated.DefaultServerPasswordSecret = current.DefaultServerPasswordSecret;
+
+    if (!root.TryGetProperty("defaultServerPasswordSecretRegion", out _))
+        updated.DefaultServerPasswordSecretRegion = current.DefaultServerPasswordSecretRegion;
 
     svc.Save(updated);
 
