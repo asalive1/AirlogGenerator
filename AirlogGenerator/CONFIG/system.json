@@ -1,0 +1,11 @@
+{
+  "webPort": 8030,
+  "defaultServerIp": "127.0.0.1",
+  "schedulerIntervalMinutes": 1,
+  "logging": {
+    "level": "INFO",
+    "retentionDays": 14,
+    "maxSizeMb": 10
+  },
+  "enableWebUi": true
+}

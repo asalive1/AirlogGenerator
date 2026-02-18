@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  airlog:
+    build:
+      context: ./AirlogGenerator
+      dockerfile: Dockerfile
+    container_name: airlog
+    ports:
+      - "8030:8030"   # omit this line if EnableWebUi is false in production
+    volumes:
+      - /etc/ag/system.json:/app/CONFIG/system.json:ro
+      - /etc/ag/stations:/app/CONFIG/stations
+      - /var/log/ag:/app/LOG
+    restart: unless-stopped
+    # Optional healthcheck: only use if EnableWebUi is true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8030/api/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

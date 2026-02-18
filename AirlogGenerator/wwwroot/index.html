@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>AIRLOG GENERATOR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="icon" type="image/x-icon" href="/AG.ico">
+    <link rel="shortcut icon" href="/AG.ico">
+</head>
+<body>
+    <header>
+        <h1>AIRLOG GENERATOR</h1>
+        <div id="status-bar">
+            <span id="app-version">v1.0.1</span>
+            <span id="db-status">DB: Unknown</span>
+            <span id="server-status">WO AFR Version: Unknown</span>
+            <span id="error-message"></span>
+            <a href="/manual.pdf" target="_blank" style="color: white; font-size: 0.9rem;">Open PDF Manual</a>
+        </div>
+    </header>
+
+    <main>
+        <section id="connection-section" style="grid-area: connection;">
+            <h2>Central Server Connection</h2>
+            <label>
+                Central Server IP:
+                <input type="text" id="server-ip" />
+            </label>
+            <button id="connect-btn">Connect</button>
+
+            <h2>System Settings</h2>
+
+            <label>
+                Web Port:
+                <input type="number" id="sys-webport" />
+            </label>
+
+            <label>
+                Scheduler Interval (minutes):
+                <input type="number" id="sys-scheduler-interval" />
+            </label>
+
+            <h3>Logging</h3>
+
+            <label>
+                Log Level:
+                <select id="sys-log-level">
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARN">WARN</option>
+                    <option value="ERROR">ERROR</option>
+                </select>
+            </label>
+
+            <label>
+                Retention Days:
+                <input type="number" id="sys-log-retention" />
+            </label>
+
+            <label>
+                Max Log Size (MB):
+                <input type="number" id="sys-log-maxsize" />
+            </label>
+
+            <button id="sys-save-btn" style="margin-top: 10px;">Save System Settings</button>
+        </section>
+
+        <section id="station-section" style="grid-area: station;">
+            <h2>Station Configuration</h2>
+            <div id="station-list"></div>
+            <div id="station-details"></div>
+        </section>
+
+        <section id="log-viewer-section" style="grid-area: log;">
+            <h2>Application Log</h2>
+            <div id="log-window"></div>
+        </section>
+    </main>
+
+    <footer>
+
+    </footer>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
