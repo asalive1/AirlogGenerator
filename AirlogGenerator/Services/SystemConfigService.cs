@@ -7,8 +7,17 @@ public class SystemConfigService
 
     public SystemConfigService()
     {
-        var appRoot = AppContext.BaseDirectory;
-        _path = Path.Combine(appRoot, "CONFIG", "system.json");
+        // Use environment variable or fallback to /app/CONFIG for containers
+        var configPath = Environment.GetEnvironmentVariable("AG_CONFIG_PATH") ?? "/app/CONFIG";
+        
+        // If the path doesn't exist and we're not in a container, use relative path
+        if (!Directory.Exists(configPath))
+        {
+            var appRoot = AppContext.BaseDirectory;
+            configPath = Path.Combine(appRoot, "CONFIG");
+        }
+        
+        _path = Path.Combine(configPath, "system.json");
     }
 
     public SystemConfig Load()

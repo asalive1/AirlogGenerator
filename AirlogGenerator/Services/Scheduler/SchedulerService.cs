@@ -25,7 +25,17 @@ namespace AirlogGenerator.Services.Scheduler
             _db = db;
             _configService = configService;
 
-            _stationConfigRoot = Path.Combine(AppContext.BaseDirectory, "CONFIG", "stations");
+            // Use environment variable or fallback to /app/CONFIG/stations for containers
+            var configPath = Environment.GetEnvironmentVariable("AG_CONFIG_PATH") ?? "/app/CONFIG";
+            
+            // If the path doesn't exist and we're not in a container, use relative path
+            if (!Directory.Exists(configPath))
+            {
+                var appRoot = AppContext.BaseDirectory;
+                configPath = Path.Combine(appRoot, "CONFIG");
+            }
+            
+            _stationConfigRoot = Path.Combine(configPath, "stations");
 
             _jsonOptions = new JsonSerializerOptions
             {

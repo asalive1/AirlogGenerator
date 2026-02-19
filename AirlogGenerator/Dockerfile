@@ -13,6 +13,10 @@ WORKDIR /app
 # Create expected directories inside container
 RUN mkdir -p /app/CONFIG /app/LOG
 
+# Set paths for volume mounts
+ENV AG_CONFIG_PATH=/app/CONFIG
+ENV AG_LOG_PATH=/app/LOG
+
 COPY --from=build /app/publish .
 
 # Expose web port (only used when EnableWebUi = true)

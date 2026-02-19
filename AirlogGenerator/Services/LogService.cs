@@ -21,7 +21,16 @@ namespace AirlogGenerator.Services
         {
             _configService = configService;
 
-            _logFolder = Path.Combine(AppContext.BaseDirectory, "LOG");
+            // Use environment variable or fallback to /app/LOG for containers
+            _logFolder = Environment.GetEnvironmentVariable("AG_LOG_PATH") ?? "/app/LOG";
+            
+            // If the path doesn't exist and we're not in a container, use relative path
+            if (!Directory.Exists(_logFolder))
+            {
+                var appRoot = AppContext.BaseDirectory;
+                _logFolder = Path.Combine(appRoot, "LOG");
+            }
+            
             Directory.CreateDirectory(_logFolder);
 
             _currentLogDate = DateTime.Now.Date;
