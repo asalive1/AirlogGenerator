@@ -9,17 +9,15 @@
     <FileVersion>1.0.6.1</FileVersion>
     <InformationalVersion>1.0.6</InformationalVersion>
 
-    <!-- Single-file publish -->
+    <!-- Publish settings - framework-dependent for Docker -->
     <PublishSingleFile>false</PublishSingleFile>
-    <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <SelfContained>false</SelfContained>
+    
+    <!-- Windows-specific settings (only for local Windows builds) -->
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
 
-    <!-- CRITICAL SETTINGS -->
     <UseAppHost>true</UseAppHost>
     <PublishReadyToRun>false</PublishReadyToRun>
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <UserSecretsId>daa467cc-d392-43f8-8b38-113590aab5e2</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>.</DockerfileContext>
