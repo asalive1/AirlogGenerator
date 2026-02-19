@@ -4,20 +4,20 @@ using System.Text.Json;
 public class SystemConfigService
 {
     private readonly string _path;
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public SystemConfigService()
     {
-        // Use environment variable or fallback to /app/CONFIG for containers
-        var configPath = Environment.GetEnvironmentVariable("AG_CONFIG_PATH") ?? "/app/CONFIG";
-        
-        // If the path doesn't exist and we're not in a container, use relative path
-        if (!Directory.Exists(configPath))
+        var configRoot = Environment.GetEnvironmentVariable("AG_CONFIG_PATH");
+        if (string.IsNullOrWhiteSpace(configRoot))
         {
-            var appRoot = AppContext.BaseDirectory;
-            configPath = Path.Combine(appRoot, "CONFIG");
+            configRoot = Path.Combine(AppContext.BaseDirectory, "CONFIG");
         }
-        
-        _path = Path.Combine(configPath, "system.json");
+
+        _path = Path.Combine(configRoot, "system.json");
     }
 
     public SystemConfig Load()
@@ -32,21 +32,39 @@ public class SystemConfigService
 
         var json = File.ReadAllText(_path);
 
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            Console.WriteLine("[CONFIG] WARNING: system.json is empty. Using defaults.");
+            return new SystemConfig();
+        }
+
         Console.WriteLine("[CONFIG] Raw JSON loaded:");
         Console.WriteLine(json);
 
-        var cfg = JsonSerializer.Deserialize<SystemConfig>(json, new JsonSerializerOptions
+        SystemConfig cfg;
+        try
         {
-            PropertyNameCaseInsensitive = true
-        }) ?? new SystemConfig();
+            cfg = JsonSerializer.Deserialize<SystemConfig>(json, _jsonOptions) ?? new SystemConfig();
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"[CONFIG] WARNING: system.json invalid JSON ({ex.Message}). Using defaults.");
+            return new SystemConfig();
+        }
 
         Console.WriteLine("[CONFIG] Parsed values:");
         Console.WriteLine($"  WebPort = {cfg.WebPort}");
         Console.WriteLine($"  DefaultServerIp = {cfg.DefaultServerIp}");
+        Console.WriteLine($"  DefaultServerHost = {cfg.DefaultServerHost}");
+        Console.WriteLine($"  DefaultServerUser = {cfg.DefaultServerUser}");
+        Console.WriteLine($"  DefaultServerPassword (empty? {string.IsNullOrWhiteSpace(cfg.DefaultServerPassword)})");
+        Console.WriteLine($"  DefaultServerPasswordSecret = {cfg.DefaultServerPasswordSecret}");
+        Console.WriteLine($"  DefaultServerPasswordSecretRegion = {cfg.DefaultServerPasswordSecretRegion}");
         Console.WriteLine($"  SchedulerIntervalMinutes = {cfg.SchedulerIntervalMinutes}");
         Console.WriteLine($"  Logging.Level = {cfg.Logging?.Level}");
         Console.WriteLine($"  Logging.RetentionDays = {cfg.Logging?.RetentionDays}");
         Console.WriteLine($"  Logging.MaxSizeMb = {cfg.Logging?.MaxSizeMb}");
+        Console.WriteLine($"  EnableWebUi = {cfg.EnableWebUi}");
 
         return cfg;
     }
@@ -54,6 +72,12 @@ public class SystemConfigService
     public void Save(SystemConfig cfg)
     {
         Console.WriteLine($"[CONFIG] Saving system.json to: {_path}");
+
+        var directory = Path.GetDirectoryName(_path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
 
         var json = JsonSerializer.Serialize(cfg, new JsonSerializerOptions
         {
