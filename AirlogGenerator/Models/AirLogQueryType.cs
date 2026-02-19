@@ -8,6 +8,6 @@
         withRotMAID = 3,
         withRotandMAID = 4,
         RotatorMAIDpid = 5,
-        Custom = 5
+        Custom = 6
     }
 }

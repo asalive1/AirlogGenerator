@@ -11,7 +11,7 @@ namespace AirlogGenerator.Services
 
         private readonly ConcurrentQueue<string> _buffer = new();
 
-        private string _currentLogFile;
+        private string? _currentLogFile;
         private DateTime _currentLogDate;
         private bool _wroteVersionHeaderToday = false;
 
@@ -21,16 +21,7 @@ namespace AirlogGenerator.Services
         {
             _configService = configService;
 
-            // Use environment variable or fallback to /app/LOG for containers
-            _logFolder = Environment.GetEnvironmentVariable("AG_LOG_PATH") ?? "/app/LOG";
-            
-            // If the path doesn't exist and we're not in a container, use relative path
-            if (!Directory.Exists(_logFolder))
-            {
-                var appRoot = AppContext.BaseDirectory;
-                _logFolder = Path.Combine(appRoot, "LOG");
-            }
-            
+            _logFolder = Path.Combine(AppContext.BaseDirectory, "LOG");
             Directory.CreateDirectory(_logFolder);
 
             _currentLogDate = DateTime.Now.Date;
@@ -125,7 +116,7 @@ namespace AirlogGenerator.Services
             string header =
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [INFO] [SYSTEM] AirlogGenerator version {version} starting.";
 
-            File.AppendAllText(_currentLogFile, header + Environment.NewLine);
+            File.AppendAllText(_currentLogFile!, header + Environment.NewLine);
             OnNewLogLine?.Invoke(header);
         }
 

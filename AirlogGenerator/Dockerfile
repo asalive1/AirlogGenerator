@@ -1,25 +1,20 @@
-# Build stage
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
-COPY . .
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app/publish
-
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
-# Create expected directories inside container
+# Install required native dependencies
+RUN apt-get update && apt-get install -y \
+    libicu-dev \
+    libssl-dev \
+    libkrb5-3 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
 RUN mkdir -p /app/CONFIG /app/LOG
 
-# Set paths for volume mounts
-ENV AG_CONFIG_PATH=/app/CONFIG
-ENV AG_LOG_PATH=/app/LOG
+RUN chmod -R 777 /app/CONFIG /app/LOG
 
-COPY --from=build /app/publish .
-
-# Expose web port (only used when EnableWebUi = true)
 EXPOSE 8030
 
 ENTRYPOINT ["dotnet", "AirlogGenerator.dll"]

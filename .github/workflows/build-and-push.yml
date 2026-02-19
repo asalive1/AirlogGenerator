@@ -2,6 +2,8 @@ name: Build and Push Docker Image
 
 on:
   push:
+    branches:
+      - main
     tags:
       - '*'
 
@@ -9,48 +11,39 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          dotnet-version: '8.0.x'
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version from tag
-        id: version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ECR }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_ECR }}
-          aws-region: us-west-2
+          images: ghcr.io/${{ github.repository_owner }}/airloggenerator
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        run: |
-          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 799696329160.dkr.ecr.us-west-2.amazonaws.com
-
-      - name: Build Docker image
-        run: |
-          cd AirlogGenerator
-          docker build -t wo-airlog-generator:${{ steps.version.outputs.version }} .
-          docker tag wo-airlog-generator:${{ steps.version.outputs.version }} 799696329160.dkr.ecr.us-west-2.amazonaws.com/wo-airlog-generator:${{ steps.version.outputs.version }}
-          docker tag wo-airlog-generator:${{ steps.version.outputs.version }} 799696329160.dkr.ecr.us-west-2.amazonaws.com/wo-airlog-generator:latest
-
-      - name: Push Docker image to ECR
-        run: |
-          docker push 799696329160.dkr.ecr.us-west-2.amazonaws.com/wo-airlog-generator:${{ steps.version.outputs.version }}
-          docker push 799696329160.dkr.ecr.us-west-2.amazonaws.com/wo-airlog-generator:latest
-
-      - name: Image pushed successfully
-        run: |
-          echo "✅ Successfully pushed wo-airlog-generator:${{ steps.version.outputs.version }} to ECR"
-          echo "✅ Successfully pushed wo-airlog-generator:latest to ECR"
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: AirlogGenerator
+          file: AirlogGenerator/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

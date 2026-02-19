@@ -4,23 +4,32 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- Versioning -->
-    <AssemblyVersion>1.0.4.0</AssemblyVersion>
-    <FileVersion>1.0.6.1</FileVersion>
-    <InformationalVersion>1.0.6</InformationalVersion>
+    <ApplicationIcon>AG.ico</ApplicationIcon>
 
-    <!-- Publish settings - framework-dependent for Docker -->
+    <!-- Versioning -->
+    <AssemblyVersion>1.1.14.6</AssemblyVersion>
+    <FileVersion>1.1.14.6</FileVersion>
+    <InformationalVersion>1.1.14</InformationalVersion>
+
+    <!-- Publish behavior -->
     <PublishSingleFile>false</PublishSingleFile>
     <SelfContained>false</SelfContained>
-    
-    <!-- Windows-specific settings (only for local Windows builds) -->
-    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
-
-    <UseAppHost>true</UseAppHost>
+    <UseAppHost>false</UseAppHost>
     <PublishReadyToRun>false</PublishReadyToRun>
-    <UserSecretsId>daa467cc-d392-43f8-8b38-113590aab5e2</UserSecretsId>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+
+    <!-- Prevent duplicate Windows/Linux publish output -->
+    <DisableRuntimeIdentifierInference>true</DisableRuntimeIdentifierInference>
+
+    <!-- Docker tooling -->
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>.</DockerfileContext>
+
+    <!-- Optional: let VS choose -->
+    <RuntimeIdentifier></RuntimeIdentifier>
+    <RuntimeIdentifiers></RuntimeIdentifiers>
+
+    <UserSecretsId>daa467cc-d392-43f8-8b38-113590aab5e2</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,6 +41,34 @@
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1" />
     <PackageReference Include="Npgsql" Version="10.0.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+	<PackageReference Include="AWSSDK.SecretsManager" Version="3.7.300.5" />
+  </ItemGroup>
+
+  <!-- Ensure all deployment files are included without duplicates -->
+  <ItemGroup>
+
+    <!-- Move docker-compose.yml up one folder during publish -->
+    <Content Update="docker-compose.yml">
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+      <TargetPath>..\docker-compose.yml</TargetPath>
+    </Content>
+
+    <!-- Move ag-install.sh up one folder during publish -->
+    <Content Update="ag-install.sh">
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+      <TargetPath>..\ag-install.sh</TargetPath>
+    </Content>
+
+    <!-- Keep Dockerfile inside AirlogGenerator folder -->
+    <Content Update="Dockerfile">
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+
+    <!-- Copy CONFIG folder into AirlogGenerator -->
+    <Content Update="CONFIG\**\*.*">
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+
   </ItemGroup>
 
 </Project>

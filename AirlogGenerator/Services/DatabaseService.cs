@@ -1,85 +1,99 @@
-﻿using Npgsql;
-using AirlogGenerator.Models;
+﻿using AirlogGenerator.Config;
 using AirlogGenerator.Database;
-using AirlogGenerator.Config;
+using AirlogGenerator.Models;
+using Npgsql;
 
 namespace AirlogGenerator.Services
 {
     public class DatabaseService
     {
-        private const string FallbackDatabaseName = "woar_server";
-        private const string FallbackUser = "ras";
-        private const string FallbackPassword = "dmarc";
-
-        private readonly SystemConfigService _systemConfigService;
-
         private string _host = "";
         private string _database = "";
         private string _user = "";
         private string _password = "";
 
-        public DatabaseService(SystemConfigService systemConfigService)
-        {
-            _systemConfigService = systemConfigService;
-        }
-
+        /// <summary>
+        /// Legacy-style connection setup used by /api/db/connect (UI).
+        /// If user/password are empty, falls back to ras/dmarc.
+        /// </summary>
         public void SetConnection(string host, string database, string user, string password)
         {
-            var cfg = _systemConfigService.Load();
+            Console.WriteLine("[DB] SetConnection called from UI.");
+            Console.WriteLine($"[DB] Host={host}, Database={database}, User={user}");
 
-            _host = ResolveHost(host, cfg);
-            _database = ResolveDatabase(database, cfg);
-            _user = ResolveUser(user, cfg);
-            _password = ResolvePassword(password, cfg);
+            _host = host;
+            _database = database;
+
+            _user = string.IsNullOrEmpty(user) ? "ras" : user;
+            _password = string.IsNullOrEmpty(password) ? "dmarc" : password;
+
+            Console.WriteLine($"[DB] Effective user={_user}, password set={(string.IsNullOrEmpty(_password) ? "NO" : "YES")}");
         }
 
-        private static string ResolveHost(string requestedHost, SystemConfig cfg)
+        /// <summary>
+        /// New config-based setup that supports:
+        /// - Direct password in system.json
+        /// - AWS Secrets Manager (when secret is configured)
+        /// - Legacy hardcoded fallback (ras/dmarc)
+        /// Used by scheduler / on-demand flows.
+        /// </summary>
+        public async Task SetConnectionFromConfigAsync(SystemConfig config)
         {
-            if (!string.IsNullOrWhiteSpace(requestedHost))
-                return requestedHost;
+            if (config == null)
+                throw new ArgumentNullException(nameof(config));
 
-            if (!string.IsNullOrWhiteSpace(cfg.DefaultServerHost))
-                return cfg.DefaultServerHost;
+            Console.WriteLine("[DB] SetConnectionFromConfigAsync called.");
 
-            return cfg.DefaultServerIp;
-        }
+            // Prefer DefaultServerHost if present, otherwise fall back to DefaultServerIp
+            _host = !string.IsNullOrWhiteSpace(config.DefaultServerHost)
+                ? config.DefaultServerHost
+                : config.DefaultServerIp;
 
-        private static string ResolveDatabase(string requestedDatabase, SystemConfig cfg)
-        {
-            if (!string.IsNullOrWhiteSpace(requestedDatabase))
-                return requestedDatabase;
+            // Database name: use configured if present, otherwise keep existing or default
+            if (!string.IsNullOrWhiteSpace(config.DefaultDatabaseName))
+            {
+                _database = config.DefaultDatabaseName;
+            }
+            else if (string.IsNullOrWhiteSpace(_database))
+            {
+                // UI currently uses "woar_server" hardcoded; keep that as a safe default
+                _database = "woar_server";
+            }
 
-            if (!string.IsNullOrWhiteSpace(cfg.DefaultDatabaseName))
-                return cfg.DefaultDatabaseName;
+            Console.WriteLine($"[DB] Host={_host}, Database={_database}");
 
-            return FallbackDatabaseName;
-        }
+            // 1. If a direct password is provided → use it (non-AWS / legacy-friendly)
+            if (!string.IsNullOrWhiteSpace(config.DefaultServerPassword))
+            {
+                Console.WriteLine("[DB] Using direct password from system.json.");
+                _user = config.DefaultServerUser ?? "ras";
+                _password = config.DefaultServerPassword;
+                return;
+            }
 
-        private static string ResolveUser(string requestedUser, SystemConfig cfg)
-        {
-            if (!string.IsNullOrWhiteSpace(requestedUser))
-                return requestedUser;
+            // 2. If no direct password, but a secret is configured → fetch from AWS
+            if (!string.IsNullOrWhiteSpace(config.DefaultServerPasswordSecret))
+            {
+                Console.WriteLine("[DB] Using AWS Secrets Manager for password.");
+                _user = config.DefaultServerUser ?? "ras";
+                _password = await SecretHelper.GetSecretAsync(
+                    config.DefaultServerPasswordSecret,
+                    config.DefaultServerPasswordSecretRegion
+                );
+                return;
+            }
 
-            if (!string.IsNullOrWhiteSpace(cfg.DefaultServerUser))
-                return cfg.DefaultServerUser;
-
-            return FallbackUser;
-        }
-
-        private static string ResolvePassword(string requestedPassword, SystemConfig cfg)
-        {
-            if (!string.IsNullOrWhiteSpace(requestedPassword))
-                return requestedPassword;
-
-            if (!string.IsNullOrWhiteSpace(cfg.DefaultServerPassword))
-                return cfg.DefaultServerPassword;
-
-            return FallbackPassword;
+            // 3. Fallback → legacy hardcoded credentials (current behavior)
+            Console.WriteLine("[DB] No password or secret configured. Falling back to legacy ras/dmarc.");
+            _user = "ras";
+            _password = "dmarc";
         }
 
         private string BuildConnectionString()
         {
-            return $"Host={_host};Port=5432;Database={_database};Username={_user};Password={_password}";
+            var cs = $"Host={_host};Port=5432;Database={_database};Username={_user};Password={_password}";
+            Console.WriteLine($"[DB] Connection string (sanitized): Host={_host}; Database={_database}; User={_user}; Password=***");
+            return cs;
         }
 
         public async Task<bool> TestConnectionAsync()
@@ -90,8 +104,9 @@ namespace AirlogGenerator.Services
                 await conn.OpenAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[DB] TestConnectionAsync failed: {ex.Message}");
                 return false;
             }
         }
@@ -101,7 +116,7 @@ namespace AirlogGenerator.Services
             using var conn = new NpgsqlConnection(BuildConnectionString());
             await conn.OpenAsync();
 
-            using var cmd = new NpgsqlCommand("SELECT version();", conn);
+            using var cmd = new NpgsqlCommand(SqlQueries.GetPostgresVersion, conn);
             return (await cmd.ExecuteScalarAsync())?.ToString() ?? "UNKNOWN";
         }
 
@@ -127,87 +142,111 @@ namespace AirlogGenerator.Services
             return list;
         }
 
-        // DatabaseService.cs (only showing the air-log related parts)
-        public async Task<List<AirLogRow>> GetRawAirLogRowsAsync(string station, DateTime date)
-        {
-            // Standard (media asset)
-            return await ExecuteAirLogQueryAsync(
-                station,
-                date,
-                SqlQueries.RawAirLogQuery,
-                mapStandard: true);
-        }
-
-        internal async Task<List<AirLogRow>> GetRotatorRowsAsync(string station, DateTime date)
+        public async Task<List<AirLogRow>> GetUnifiedRowsAsync(string station, DateTime date)
         {
             return await ExecuteAirLogQueryAsync(
                 station,
                 date,
-                SqlQueries.RawAirLogQuery_Rotator,
-                mapStandard: false);
+                SqlQueries.RawAirLogQuery_Unified
+            );
         }
-
-        internal async Task<List<AirLogRow>> GetPartnerIdRowsAsync(string station, DateTime date)
-        {
-            return await ExecuteAirLogQueryAsync(
-                station,
-                date,
-                SqlQueries.RawAirLogQuery_PartnerId,
-                mapStandard: false);
-        }
-
-        internal async Task<List<AirLogRow>> GetRotatorPartnerIdRowsAsync(string station, DateTime date)
-        {
-            return await ExecuteAirLogQueryAsync(
-                station,
-                date,
-                SqlQueries.RawAirLogQuery_RotatorPartnerId,
-                mapStandard: false);
-        }
-
-        // For Rotator+MAID, we’ll handle mapping directly in the strategy since it returns 2 lines per row.
 
         private async Task<List<AirLogRow>> ExecuteAirLogQueryAsync(
             string station,
             DateTime date,
-            string sql,
-            bool mapStandard)
+            string sql)
         {
-            var list = new List<AirLogRow>();
+            var rows = new List<AirLogRow>();
 
-            using var conn = new NpgsqlConnection(BuildConnectionString());
+            await using var conn = new NpgsqlConnection(BuildConnectionString());
             await conn.OpenAsync();
 
-            var startDate = date.Date;
-            var endDate = date.Date;
-
-            using var cmd = new NpgsqlCommand(sql, conn);
+            await using var cmd = new NpgsqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("station", station);
-            cmd.Parameters.AddWithValue("startDate", startDate);
-            cmd.Parameters.AddWithValue("endDate", endDate);
+            cmd.Parameters.AddWithValue("date", date.Date);
 
-            using var reader = await cmd.ExecuteReaderAsync();
+            await using var reader = await cmd.ExecuteReaderAsync();
 
             while (await reader.ReadAsync())
             {
-                // Columns 0..8 for standard/rotator/partner queries
+                var idxPlaylist = reader.GetOrdinal("playlist_entry_id");
+                int playlistEntryId = reader.IsDBNull(idxPlaylist)
+                    ? 0
+                    : reader.GetInt32(idxPlaylist);
+
                 var row = new AirLogRow
                 {
-                    AirDate = reader.GetDateTime(0),
-                    AirTimeMs = reader.GetInt32(1),
-                    Status = reader.IsDBNull(2) ? "" : reader.GetString(2),
-                    Cart = reader.IsDBNull(3) ? "" : reader.GetString(3),
-                    Category = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                    Title = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                    Artist = reader.IsDBNull(6) ? "" : reader.GetString(6),
-                    LengthMs = reader.IsDBNull(7) ? 0 : reader.GetInt32(7),
-                    OriginalScheduledTime = reader.IsDBNull(8) ? 0 : reader.GetInt64(8)
+                    AirDate = reader.GetDateTime(reader.GetOrdinal("air_date")),
+                    AirTimeMs = reader.GetInt32(reader.GetOrdinal("air_time")),
+                    Status = reader["status"] as string ?? "",
+
+                    Cart = reader["combined_cart"] as string
+                               ?? reader["media_cart"] as string
+                               ?? reader["playlist_cart"] as string
+                               ?? "",
+
+                    Category = reader["media_category"] as string
+                               ?? reader["playlist_category"] as string
+                               ?? "",
+
+                    Title = reader["media_title"] as string
+                            ?? reader["playlist_title"] as string
+                            ?? "",
+
+                    Artist = reader["media_artist"] as string
+                             ?? reader["playlist_artist"] as string
+                             ?? "",
+
+                    LengthMs = reader["length_ms"] is DBNull
+                        ? 0
+                        : Convert.ToInt32(reader["length_ms"]),
+
+                    OriginalScheduledTime = reader["original_scheduled_time"] is DBNull
+                        ? 0
+                        : Convert.ToInt64(reader["original_scheduled_time"]),
+
+                    EntryType = reader["entry_type"] as string ?? "",
+                    EntryDescription = reader["entry_description"] as string ?? "",
+                    PartnerId = reader["partner_id"] as string ?? "",
+
+                    PlaylistCart = reader["playlist_cart"] as string,
+                    PlaylistCategory = reader["playlist_category"] as string,
+                    PlaylistTitle = reader["playlist_title"] as string,
+                    PlaylistArtist = reader["playlist_artist"] as string,
+                    PlaylistClass = reader["playlist_class"] as string,
+                    PlaylistOriginalType = reader["playlist_original_type"] as string,
+                    PlaylistType = reader["playlist_type"] as string,
+                    PlaylistEntryId = playlistEntryId,
+
+                    MediaCart = reader["media_cart"] as string,
+                    MediaCategory = reader["media_category"] as string,
+                    MediaTitle = reader["media_title"] as string,
+                    MediaArtist = reader["media_artist"] as string,
+                    MediaClass = reader["media_class"] as string
                 };
 
-                list.Add(row);
+                rows.Add(row);
             }
 
-            return list;
+            // Collapse duplicate EVENT rows, but keep separate occurrences (by time)
+            rows = rows
+             .GroupBy(r => new
+             {
+                 r.PlaylistEntryId,
+                 r.EntryType,
+                 r.EntryDescription,
+                 r.AirDate,
+                 r.AirTimeMs,
+                 r.Status
+             })
+             .Select(g =>
+                 AirLogRowHelpers.IsNonMediaEvent(g.First())
+                     ? g.OrderBy(x => x.AirTimeMs).First()
+                     : g.First()
+             )
+             .ToList();
+
+            return rows;
         }
     }
 }

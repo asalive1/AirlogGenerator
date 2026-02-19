@@ -15,6 +15,7 @@ namespace AirlogGenerator.Services
                 AirLogQueryType.withRotMAID => new RotatorMediaAssetQuery(),
                 AirLogQueryType.withRotandMAID => new RotatorPartnerIdQuery(),
                 AirLogQueryType.RotatorMAIDpid => new RotatorMediaAssetPartnerIdQuery(),
+                AirLogQueryType.Custom => new StandardAirLogQuery(), // placeholder for future
 
                 _ => new StandardAirLogQuery()
             };

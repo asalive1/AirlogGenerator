@@ -1,24 +1,57 @@
-﻿using AirlogGenerator.Models;
-
-public static class AirLogRowHelpers
+﻿namespace AirlogGenerator.Models
 {
-    public static bool IsRotatorPair(AirLogRow a, AirLogRow b)
+    public static class AirLogRowHelpers
     {
-        if (a == null || b == null)
+        public static bool IsNonMediaEvent(AirLogRow row)
+        {
+            if (row == null)
+                return false;
+
+            if (string.IsNullOrWhiteSpace(row.EntryType))
+                return false;
+
+            var type = row.EntryType;
+
+            return type.Contains("WorkflowEntry", StringComparison.OrdinalIgnoreCase)
+                || type.Contains("MemoEntry", StringComparison.OrdinalIgnoreCase)
+                || type.Contains("SegmentRulesetEntry", StringComparison.OrdinalIgnoreCase)
+                || type.Contains("LiveCopyEntry", StringComparison.OrdinalIgnoreCase)
+                || type.Contains("ManualEntry", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static string GetTypeAbbreviation(string playlistType)
+        {
+            if (string.IsNullOrWhiteSpace(playlistType))
+                return "DA";
+
+            return playlistType.ToUpperInvariant() switch
+            {
+                "VOICE_OVER" => "VO",
+                "DIGITAL_AUDIO" => "DA",
+                "VOCAL_PROTECT" => "VP",
+                "DOUBLE_START" => "DS",
+                "VOICE_TRACK" => "VT",
+                _ => "DA"
+            };
+        }
+
+        // ROTATOR RULE:
+        // playlist_cart != media_cart → rotator
+        public static bool IsRotator(AirLogRow row)
+        {
+            if (row == null)
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(row.PlaylistCart) &&
+                !string.IsNullOrWhiteSpace(row.MediaCart) &&
+                !string.Equals(row.PlaylistCart, row.MediaCart, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             return false;
-
-        // Must share exact timestamp
-        if (a.AirDate != b.AirDate || a.AirTimeMs != b.AirTimeMs)
-            return false;
-
-        // Must have different carts
-        if (string.Equals(a.Cart, b.Cart, StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        // Titles or artists must differ
-        bool titleDiffers = !string.Equals(a.Title, b.Title, StringComparison.OrdinalIgnoreCase);
-        bool artistDiffers = !string.Equals(a.Artist, b.Artist, StringComparison.OrdinalIgnoreCase);
-
-        return titleDiffers || artistDiffers;
+        }
     }
+
+
 }

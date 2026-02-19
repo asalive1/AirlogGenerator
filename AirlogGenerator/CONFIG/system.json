@@ -1,17 +1,17 @@
 {
   "webPort": 8030,
-  "defaultServerIp": "127.0.0.1",
+  "defaultServerIp": "192.168.50.150",
   "defaultServerHost": "",
   "defaultDatabaseName": "woar_server",
-  "defaultServerUser": "",
-  "defaultServerPassword": "",
-  "defaultServerPasswordSecret": "",
-  "defaultServerPasswordSecretRegion": "",
   "schedulerIntervalMinutes": 1,
   "logging": {
     "level": "INFO",
     "retentionDays": 14,
     "maxSizeMb": 10
   },
-  "enableWebUi": true
+  "enableWebUi": true,
+  "defaultServerUser": "",
+  "defaultServerPassword": "",
+  "defaultServerPasswordSecret": "",
+  "defaultServerPasswordSecretRegion": ""
 }

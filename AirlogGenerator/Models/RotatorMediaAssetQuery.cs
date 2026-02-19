@@ -1,9 +1,8 @@
-﻿using AirlogGenerator.Database;
-using AirlogGenerator.Services;
-using Npgsql;
+﻿using AirlogGenerator.Services;
 
 namespace AirlogGenerator.Models
 {
+
     public class RotatorMediaAssetQuery : IAirLogQueryStrategy
     {
         public async Task<List<AirLogRow>> ExecuteAsync(
@@ -11,81 +10,86 @@ namespace AirlogGenerator.Models
             string station,
             DateTime date)
         {
-            var list = new List<AirLogRow>();
+            var rows = await db.GetUnifiedRowsAsync(station, date);
 
-            using var conn = new NpgsqlConnection(db.GetType()
-                .GetMethod("BuildConnectionString", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-                .Invoke(db, null)?.ToString());
+            var result = new List<AirLogRow>();
 
-            await conn.OpenAsync();
-
-            var startDate = date.Date;
-            var endDate = date.Date;
-
-            using var cmd = new NpgsqlCommand(SqlQueries.RawAirLogQuery_RotatorPlusCart, conn);
-            cmd.Parameters.AddWithValue("station", station);
-            cmd.Parameters.AddWithValue("startDate", startDate);
-            cmd.Parameters.AddWithValue("endDate", endDate);
-
-            using var reader = await cmd.ExecuteReaderAsync();
-
-            while (await reader.ReadAsync())
+            foreach (var row in rows)
             {
-                var airDate = reader.GetDateTime(0);
-                var airTimeMs = reader.GetInt32(1);
-                var status = reader.IsDBNull(2) ? "" : reader.GetString(2);
-
-                // Rotator (playlist entry) row
-                var rotatorRow = new AirLogRow
+                // ⭐ Events pass through unchanged
+                if (AirLogRowHelpers.IsNonMediaEvent(row))
                 {
-                    AirDate = airDate,
-                    AirTimeMs = airTimeMs,
-                    Status = status,
-                    Cart = reader.IsDBNull(3) ? "" : reader.GetString(3),
-                    Category = reader.IsDBNull(4) ? "" : reader.GetString(4),
-                    Title = reader.IsDBNull(5) ? "" : reader.GetString(5),
-                    Artist = reader.IsDBNull(6) ? "" : reader.GetString(6),
-                    LengthMs = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
-                    OriginalScheduledTime = reader.IsDBNull(12) ? 0 : reader.GetInt64(12)
+                    result.Add(row);
+                    continue;
+                }
+
+                // ⭐ Non-rotator media pass through unchanged
+                if (!AirLogRowHelpers.IsRotator(row))
+                {
+                    result.Add(row);
+                    continue;
+                }
+
+                var abbrev = AirLogRowHelpers.GetTypeAbbreviation(row.PlaylistType);
+
+                // ⭐ ROTATOR: add playlist cut FIRST
+                var playlistOnly = new AirLogRow
+                {
+                    AirDate = row.AirDate,
+                    AirTimeMs = row.AirTimeMs,
+                    Status = row.Status,
+
+                    Cart = $"{abbrev}{row.PlaylistCart}",
+                    Category = row.PlaylistCategory,
+                    Title = row.PlaylistTitle,
+                    Artist = row.PlaylistArtist,
+
+                    LengthMs = row.LengthMs,
+                    OriginalScheduledTime = row.OriginalScheduledTime,
+                    EntryType = row.EntryType,
+                    EntryDescription = row.EntryDescription,
+                    PartnerId = row.PartnerId,
+
+                    PlaylistCart = row.PlaylistCart,
+                    PlaylistCategory = row.PlaylistCategory,
+                    PlaylistTitle = row.PlaylistTitle,
+                    PlaylistArtist = row.PlaylistArtist,
+                    PlaylistClass = row.PlaylistClass,
+                    PlaylistOriginalType = row.PlaylistOriginalType,
+                    PlaylistType = row.PlaylistType
                 };
 
-                // Media asset row
-                var maidRow = new AirLogRow
+                result.Add(playlistOnly);
+
+                // ⭐ ROTATOR: add media asset SECOND
+                var mediaOnly = new AirLogRow
                 {
-                    AirDate = airDate,
-                    AirTimeMs = airTimeMs,
-                    Status = status,
-                    Cart = reader.IsDBNull(7) ? "" : reader.GetString(7),
-                    Category = reader.IsDBNull(8) ? "" : reader.GetString(8),
-                    Title = reader.IsDBNull(9) ? "" : reader.GetString(9),
-                    Artist = reader.IsDBNull(10) ? "" : reader.GetString(10),
-                    LengthMs = reader.IsDBNull(11) ? 0 : reader.GetInt32(11),
-                    OriginalScheduledTime = reader.IsDBNull(12) ? 0 : reader.GetInt64(12)
+                    AirDate = row.AirDate,
+                    AirTimeMs = row.AirTimeMs,
+                    Status = row.Status,
+
+                    Cart = $"{abbrev}{row.MediaCart}",
+                    Category = row.MediaCategory,
+                    Title = row.MediaTitle,
+                    Artist = row.MediaArtist,
+
+                    LengthMs = row.LengthMs,
+                    OriginalScheduledTime = row.OriginalScheduledTime,
+                    EntryType = row.EntryType,
+                    EntryDescription = row.EntryDescription,
+                    PartnerId = row.PartnerId,
+
+                    MediaCart = row.MediaCart,
+                    MediaCategory = row.MediaCategory,
+                    MediaTitle = row.MediaTitle,
+                    MediaArtist = row.MediaArtist,
+                    MediaClass = row.MediaClass
                 };
 
-                // Determine if this entry is a true rotator
-                bool isRotator =
-                    !string.IsNullOrWhiteSpace(rotatorRow.Cart) &&
-                    !string.Equals(rotatorRow.Cart, maidRow.Cart, StringComparison.OrdinalIgnoreCase) &&
-                    (
-                        !string.Equals(rotatorRow.Title, maidRow.Title, StringComparison.OrdinalIgnoreCase) ||
-                        !string.Equals(rotatorRow.Artist, maidRow.Artist, StringComparison.OrdinalIgnoreCase)
-                    );
-
-                if (isRotator)
-                {
-                    // Emit both rows (playlist entry + media asset)
-                    list.Add(rotatorRow);
-                    list.Add(maidRow);
-                }
-                else
-                {
-                    // Non‑rotator → emit only the media asset row
-                    list.Add(maidRow);
-                }
+                result.Add(mediaOnly);
             }
 
-            return list;
+            return result;
         }
     }
 }
