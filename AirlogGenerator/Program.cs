@@ -14,17 +14,26 @@ if (OperatingSystem.IsWindows() && !Environment.UserInteractive)
 }
 
 // Load config paths
-var appRoot = Path.GetDirectoryName(Environment.ProcessPath)!;
-var systemConfigPath = Path.Combine(appRoot, "CONFIG", "system.json");
-var stationConfigRoot = Path.Combine(appRoot, "CONFIG", "stations");
+var configPath = Environment.GetEnvironmentVariable("AG_CONFIG_PATH") ?? "/app/CONFIG";
+var logPath = Environment.GetEnvironmentVariable("AG_LOG_PATH") ?? "/app/LOG";
+
+// Fallback to relative paths for local development
+if (!Directory.Exists(configPath))
+{
+    var appRoot = AppContext.BaseDirectory;
+    configPath = Path.Combine(appRoot, "CONFIG");
+    logPath = Path.Combine(appRoot, "LOG");
+}
+
+var systemConfigPath = Path.Combine(configPath, "system.json");
+var stationConfigRoot = Path.Combine(configPath, "stations");
+
 Console.WriteLine("====================================================");
 Console.WriteLine("[STARTUP] Application starting");
-Console.WriteLine($"[STARTUP] AppContext.BaseDirectory = {appRoot}");
+Console.WriteLine($"[STARTUP] Config path = {configPath}");
+Console.WriteLine($"[STARTUP] Log path = {logPath}");
 Console.WriteLine($"[STARTUP] system.json expected at = {systemConfigPath}");
 Console.WriteLine("====================================================");
-
-Console.WriteLine($"[CONFIG] App Root: {appRoot}");
-Console.WriteLine($"[CONFIG] system.json path: {systemConfigPath}");
 
 Directory.CreateDirectory(stationConfigRoot);
 
@@ -59,30 +68,28 @@ builder.WebHost.ConfigureKestrel(options =>
 //  INITIALIZATION SYSTEM
 // ======================================================
 
-static void InitializeAppEnvironment(string appRoot, LogService? log)
+static void InitializeAppEnvironment(string configPath, string logPath, LogService? log)
 {
     bool firstRun = false;
 
     // 1. LOG folder
-    var logDir = Path.Combine(appRoot, "LOG");
-    if (!Directory.Exists(logDir))
+    if (!Directory.Exists(logPath))
     {
-        Directory.CreateDirectory(logDir);
+        Directory.CreateDirectory(logPath);
         firstRun = true;
         log?.Info("INIT", "Created LOG folder.");
     }
 
     // 2. CONFIG folder
-    var configDir = Path.Combine(appRoot, "CONFIG");
-    if (!Directory.Exists(configDir))
+    if (!Directory.Exists(configPath))
     {
-        Directory.CreateDirectory(configDir);
+        Directory.CreateDirectory(configPath);
         firstRun = true;
         log?.Info("INIT", "Created CONFIG folder.");
     }
 
     // 3. CONFIG\stations folder
-    var stationsDir = Path.Combine(configDir, "stations");
+    var stationsDir = Path.Combine(configPath, "stations");
     if (!Directory.Exists(stationsDir))
     {
         Directory.CreateDirectory(stationsDir);
@@ -91,7 +98,7 @@ static void InitializeAppEnvironment(string appRoot, LogService? log)
     }
 
     // 4. system.json default file
-    var systemJsonPath = Path.Combine(configDir, "system.json");
+    var systemJsonPath = Path.Combine(configPath, "system.json");
     if (!File.Exists(systemJsonPath))
     {
         EnsureDefaultSystemJson(systemJsonPath);
@@ -99,8 +106,8 @@ static void InitializeAppEnvironment(string appRoot, LogService? log)
         log?.Info("INIT", "Created default system.json.");
     }
 
-    // 5. wwwroot folder
-    var wwwrootDir = Path.Combine(appRoot, "wwwroot");
+    // 5. wwwroot folder - use AppContext.BaseDirectory for embedded resources
+    var wwwrootDir = Path.Combine(AppContext.BaseDirectory, "wwwroot");
     if (!Directory.Exists(wwwrootDir))
     {
         Directory.CreateDirectory(wwwrootDir);
@@ -201,7 +208,7 @@ var startupLog = app.Services.GetRequiredService<LogService>();
 
 startupLog.Info("SYSTEM", $"Version Info ? Informational: {info}, File: {file}, Assembly: {assembly}");
 
-InitializeAppEnvironment(appRoot, startupLog);
+InitializeAppEnvironment(configPath, logPath, startupLog);
 
 // Log active ports
 var addresses = app.Urls;
