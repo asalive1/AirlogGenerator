@@ -164,13 +164,37 @@ static void ExtractEmbeddedWwwroot(string targetDir, LogService? log)
     {
         if (!res.Contains("wwwroot")) continue;
 
-        // Convert resource name to file path
-        var relative = res.Substring(res.IndexOf("wwwroot"));
-        var filePath = Path.Combine(targetDir, relative.Replace('.', Path.DirectorySeparatorChar));
+        // Extract the part after "wwwroot" in the resource name
+        // e.g., "AirlogGenerator.wwwroot.css.styles.css" -> "css/styles.css"
+        var wwwrootIndex = res.IndexOf("wwwroot") + "wwwroot".Length;
+        if (wwwrootIndex >= res.Length) continue;
+        
+        var relative = res.Substring(wwwrootIndex).TrimStart('.');
+        
+        // Replace dots with path separators, but preserve the file extension
+        var lastDotIndex = relative.LastIndexOf('.');
+        if (lastDotIndex > 0)
+        {
+            var pathPart = relative.Substring(0, lastDotIndex).Replace('.', Path.DirectorySeparatorChar);
+            var extension = relative.Substring(lastDotIndex);
+            relative = pathPart + extension;
+        }
+        
+        var filePath = Path.Combine(targetDir, relative);
 
         var dir = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
+        {
+            try
+            {
+                Directory.CreateDirectory(dir);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                log?.Info("INIT", $"Skipping wwwroot extraction - no write permission to {dir}");
+                return; // Skip all wwwroot extraction if we can't write
+            }
+        }
 
         if (!File.Exists(filePath))
         {
@@ -181,10 +205,16 @@ static void ExtractEmbeddedWwwroot(string targetDir, LogService? log)
                 continue;
             }
 
-            using var fs = File.Create(filePath);
-            stream.CopyTo(fs);
-
-            log?.Info("INIT", $"Extracted wwwroot file: {relative}");
+            try
+            {
+                using var fs = File.Create(filePath);
+                stream.CopyTo(fs);
+                log?.Info("INIT", $"Extracted wwwroot file: {relative}");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                log?.Info("INIT", $"Skipping wwwroot file - no write permission: {relative}");
+            }
         }
     }
 }
