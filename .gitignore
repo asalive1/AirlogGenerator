@@ -1,0 +1,14 @@
+bin/
+obj/
+artifacts/
+publish/
+LOG/
+.vs/
+.vscode/
+*.user
+*.suo
+*.tmp
+*.log
+*.pdb
+*.tar
+*.zip

@@ -1,0 +1,14 @@
+services:
+  airlog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airlog-generator
+    ports:
+      - "8030:8030"
+    volumes:
+      - ${AG_CONFIG_ROOT:-/etc/ag}/system.json:/app/CONFIG/system.json:ro
+      - ${AG_CONFIG_ROOT:-/etc/ag}/stations:/app/CONFIG/stations
+      - ${AG_LOG_ROOT:-/var/log/ag}:/app/LOG
+      - ${WO_LOG_ROOT:-/srv/wo/cs/logs}:/srv/wo/cs/logs
+    restart: unless-stopped
