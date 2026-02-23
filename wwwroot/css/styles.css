@@ -1,0 +1,114 @@
+﻿body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background-color: #003366;
+    color: white;
+    padding: 10px 20px;
+}
+
+#status-bar {
+    display: flex;
+    gap: 20px;
+    font-size: 0.9rem;
+}
+
+main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+        "connection station"
+        "log station";
+    gap: 20px;
+}
+
+#connection-section, #station-section, #log-viewer-section {
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+#log-window {
+    height: 500px;
+    overflow-y: scroll;
+    overflow-x: auto;
+    white-space: pre-line; /* preserves newlines and spacing */
+    background: #111;
+    color: #0f0;
+    font-family: Consolas, monospace;
+    font-size: 0.85rem;
+    padding: 5px;
+    border: 1px solid #444;
+}
+#log-viewer-section {
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.station-item {
+    padding: 4px 8px;
+    border-bottom: 1px solid #ccc;
+    cursor: pointer;
+}
+
+    .station-item:hover {
+        background-color: #eef;
+    }
+
+#schedule-list {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+}
+
+.sched-wrapper {
+    display: block;
+    margin-bottom: 10px;
+}
+
+.sched-dest-block {
+    margin-left: 20px;
+    margin-top: 5px;
+}
+#station-section {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+#station-details {
+    flex-grow: 1;
+    overflow-y: auto;
+    max-height: 80vh; /* or remove this line if you want full expansion */
+}
+
+.calendar-cell {
+    padding: 8px;
+    text-align: center;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    user-select: none;
+    background-color: #f9f9f9;
+}
+
+.calendar-cell:hover {
+        background-color: #eef;
+    }
+
+.calendar-cell.selected {
+        background-color: #cce;
+        border-color: #99c;
+    }
+
+.calendar-cell.disabled {
+        background-color: #eee;
+        color: #999;
+        border-color: #ddd;
+        pointer-events: none;
+    }

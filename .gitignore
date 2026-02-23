@@ -1,20 +1,14 @@
-# Build outputs
-**/bin/
-**/obj/
-
-# User-specific files
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
-# IDE folders
+bin/
+obj/
+artifacts/
+publish/
+LOG/
 .vs/
 .vscode/
-
-# Logs
+*.user
+*.suo
+*.tmp
 *.log
-
-# OS files
-.DS_Store
-Thumbs.db
+*.pdb
+*.tar
+*.zip
