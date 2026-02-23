@@ -31,6 +31,34 @@ function mapQueryType(num) {
     }
 }
 
+function normalizeQueryType(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        const parsed = parseInt(value, 10);
+        if (!Number.isNaN(parsed)) {
+            return parsed;
+        }
+
+        switch (value) {
+            case "withPartnerID": return 1;
+            case "withRotIDonly": return 2;
+            case "withRotMAID": return 3;
+            case "withRotandMAID": return 4;
+            case "RotatorMAIDpid":
+            case "Rotator+MAID+PID":
+                return 5;
+            case "Standard":
+            default:
+                return 0;
+        }
+    }
+
+    return 0;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     appendLog("[INFO] AIRLOG GENERATOR UI loaded.");
 
@@ -955,9 +983,7 @@ function renderSchedule(list) {
         entry.time = entry.time || "00:15";
         entry.destinations = entry.destinations || [];
         // NEW: default queryType if missing
-        if (entry.queryType === undefined || entry.queryType === null) {
-            entry.queryType = 0; // Standard
-        }
+        entry.queryType = normalizeQueryType(entry.queryType);
 
         let line1 = `
             <div class="sched-row">
@@ -1013,7 +1039,7 @@ function renderSchedule(list) {
                     <option value="2" ${entry.queryType === 2 ? "selected" : ""}>Rotator Only</option>
                     <option value="3" ${entry.queryType === 3 ? "selected" : ""}>Rotator + MAID</option>
                     <option value="4" ${entry.queryType === 4 ? "selected" : ""}>Rotator + Partner ID</option>
-                    <option value="5" ${entry.queryType === 4 ? "selected" : ""}>Rotator + MAID + Partner ID</option>
+                    <option value="5" ${entry.queryType === 5 ? "selected" : ""}>Rotator + MAID + Partner ID</option>
                 </select>
             </div>
         `;
