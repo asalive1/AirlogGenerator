@@ -7,9 +7,9 @@
     <ApplicationIcon>AG.ico</ApplicationIcon>
 
     <!-- Versioning -->
-    <AssemblyVersion>1.1.14.6</AssemblyVersion>
-    <FileVersion>1.1.14.6</FileVersion>
-    <InformationalVersion>1.1.14</InformationalVersion>
+    <AssemblyVersion>1.1.15.1</AssemblyVersion>
+    <FileVersion>1.1.15.1</FileVersion>
+    <InformationalVersion>1.1.15</InformationalVersion>
 
     <!-- Publish behavior -->
     <PublishSingleFile>false</PublishSingleFile>
