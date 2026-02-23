@@ -49,7 +49,11 @@ echo "[STEP] Starting Docker Compose..."
 # Move to the folder where docker-compose.yml lives
 cd "$(dirname "$0")"
 
-docker compose up -d --build
+echo "[STEP] Pulling latest image from GHCR..."
+docker compose pull
+
+echo "[STEP] Starting/updating container..."
+docker compose up -d
 
 echo "=== Deployment Complete ==="
 echo "Config directory: /etc/ag/"

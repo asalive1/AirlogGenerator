@@ -1,8 +1,7 @@
 services:
   airlog:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/asalive1/airloggenerator:latest
+    pull_policy: always
     container_name: airlog-generator
     ports:
       - "8030:8030"
