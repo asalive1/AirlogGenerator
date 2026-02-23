@@ -408,7 +408,7 @@ function renderStationEditor(cfg) {
         <button id="save-btn" style="margin-top: 20px;">Save Station Config</button>
     `;
 
-    document.getElementById("save-btn").addEventListener("click", () => {
+    document.getElementById("save-btn").addEventListener("click", async () => {
         const name = cfg.stationName;
 
         cfg.enableTimezoneCalc = document.getElementById("tz-enable").checked;
@@ -417,17 +417,30 @@ function renderStationEditor(cfg) {
             .map(i => i.value);
 
         cfg.host = document.getElementById("server-ip").value;
+        cfg.schedule = (cfg.schedule || []).map(entry => ({
+            ...entry,
+            queryType: normalizeQueryType(entry.queryType)
+        }));
 
         console.log("Saving station:", name);
         console.log("Saving config:", cfg);
 
-        fetch(`/api/stations/${name}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(cfg, null, 2)
-        })
-            .then(() => appendLog(`[SUCCESS] Saved configuration for ${name}`))
-            .catch(err => appendLog(`[ERROR] Failed to save: ${err}`));
+        try {
+            const res = await fetch(`/api/stations/${encodeURIComponent(name)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(cfg, null, 2)
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`HTTP ${res.status}: ${errText}`);
+            }
+
+            appendLog(`[SUCCESS] Saved configuration for ${name}`);
+        } catch (err) {
+            appendLog(`[ERROR] Failed to save: ${err}`);
+        }
     });
 
     document.getElementById("tz-enable").addEventListener("change", () => {
