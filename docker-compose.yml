@@ -1,6 +1,6 @@
 services:
   airlog:
-    image: ghcr.io/asalive1/airloggenerator:1.1.15.2
+    image: ghcr.io/asalive1/airloggenerator:1.1.15.3
     pull_policy: always
     container_name: airlog-generator
     ports:
