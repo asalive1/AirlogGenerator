@@ -565,7 +565,8 @@ function renderStationEditor(cfg) {
             const data = await res.json();
 
             if (!data.success) {
-                appendLog("[WARN] No preview data returned.");
+                const reason = data.message || data.detail || data.title || "No preview data returned.";
+                appendLog(`[WARN] ${reason}`);
                 return;
             }
 

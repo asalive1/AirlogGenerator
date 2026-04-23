@@ -121,25 +121,10 @@ WHERE ale.radio_station_name = @station
         -- MEDIA ROWS
         ----------------------------------------------------------------------
         (
-            -- COMPLETED/SKIPPED/FAILED/STOPPED
-            (
-                ale.playlist_entry_class = 'PlayableEntry'
-                AND ale.status IN ('COMPLETED', 'SKIPPED', 'FAILED', 'STOPPED')
-            )
-
-            OR
-
-            -- STARTED fallback (only when no COMPLETED exists)
-            (
-                ale.playlist_entry_class = 'PlayableEntry'
-                AND ale.status = 'STARTED'
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM air_log_entry ale2
-                    WHERE ale2.playlist_entry_id = ale.playlist_entry_id
-                      AND ale2.status = 'COMPLETED'
-                )
-            )
+            -- Include both start and terminal rows; formatter pairs them so
+            -- on-air can publish start time while preserving played duration.
+            ale.playlist_entry_class = 'PlayableEntry'
+            AND ale.status IN ('STARTED', 'COMPLETED', 'SKIPPED', 'FAILED', 'STOPPED')
         )
 
         ----------------------------------------------------------------------

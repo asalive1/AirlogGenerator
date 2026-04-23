@@ -514,13 +514,9 @@ if (cfgForRuntime.EnableWebUi)
             return Results.Problem($"Cannot create destination: {ex.Message}");
         }
 
-        var cfgFile = Path.Combine(stationConfigRoot, $"{req.Station}.json");
-        if (!File.Exists(cfgFile))
-            return Results.Problem("Station config not found.");
-
-        var cfgJson = await File.ReadAllTextAsync(cfgFile);
-        var cfg = JsonSerializer.Deserialize<StationConfig>(cfgJson, jsonOptions)
-                  ?? throw new Exception("Invalid station config");
+        var cfg = await LoadStationConfigForOnDemandAsync(req.Station, db, log);
+        if (cfg is null)
+            return Results.Problem($"Station config not found for '{req.Station}' and fallback from database failed.");
 
         double offset = cfg.TimezoneOffset;
         bool useOffset = cfg.EnableTimezoneCalc;
@@ -577,13 +573,9 @@ if (cfgForRuntime.EnableWebUi)
         if (req.Dates == null || req.Dates.Count == 0)
             return Results.BadRequest("At least one date is required.");
 
-        var cfgFile = Path.Combine(stationConfigRoot, $"{req.Station}.json");
-        if (!File.Exists(cfgFile))
-            return Results.Problem("Station config not found.");
-
-        var cfgJson = await File.ReadAllTextAsync(cfgFile);
-        var cfg = JsonSerializer.Deserialize<StationConfig>(cfgJson, jsonOptions)
-                  ?? throw new Exception("Invalid station config");
+        var cfg = await LoadStationConfigForOnDemandAsync(req.Station, db, log);
+        if (cfg is null)
+            return Results.Problem($"Station config not found for '{req.Station}' and fallback from database failed.");
 
         double offset = cfg.TimezoneOffset;
         bool useOffset = cfg.EnableTimezoneCalc;
@@ -659,13 +651,9 @@ if (cfgForRuntime.EnableWebUi)
         if (req.Dates == null || req.Dates.Count == 0)
             return Results.BadRequest("At least one date is required.");
 
-        var cfgFile = Path.Combine(stationConfigRoot, $"{req.Station}.json");
-        if (!File.Exists(cfgFile))
-            return Results.Problem("Station config not found.");
-
-        var cfgJson = await File.ReadAllTextAsync(cfgFile);
-        var cfg = JsonSerializer.Deserialize<StationConfig>(cfgJson, jsonOptions)
-                  ?? throw new Exception("Invalid station config");
+        var cfg = await LoadStationConfigForOnDemandAsync(req.Station, db, log);
+        if (cfg is null)
+            return Results.Problem($"Station config not found for '{req.Station}' and fallback from database failed.");
 
         double offset = cfg.TimezoneOffset;
         bool useOffset = cfg.EnableTimezoneCalc;
@@ -775,6 +763,62 @@ if (cfgForRuntime.EnableWebUi)
 
         string fileName = date.ToString("yyMMdd") + ".air";
         return (fileName, lines);
+    }
+
+    async Task<StationConfig?> LoadStationConfigForOnDemandAsync(
+        string requestedStation,
+        DatabaseService db,
+        LogService log)
+    {
+        var cfgFile = Path.Combine(stationConfigRoot, $"{requestedStation}.json");
+
+        if (File.Exists(cfgFile))
+        {
+            var cfgJson = await File.ReadAllTextAsync(cfgFile);
+            var cfg = JsonSerializer.Deserialize<StationConfig>(cfgJson, jsonOptions)
+                      ?? throw new Exception("Invalid station config");
+
+            if (string.IsNullOrWhiteSpace(cfg.StationName))
+                cfg.StationName = requestedStation;
+
+            return cfg;
+        }
+
+        log.Info("ONDEMAND", $"[FALLBACK] Station config missing for '{requestedStation}'. Attempting DB fallback.");
+
+        var stations = await db.GetStationListWithOffsetsAsync();
+        var station = stations.FirstOrDefault(s =>
+            string.Equals(s.StationName, requestedStation, StringComparison.OrdinalIgnoreCase));
+
+        if (station == null)
+        {
+            log.Error("ONDEMAND", $"[FALLBACK] Station '{requestedStation}' not found in DB station list.");
+            return null;
+        }
+
+        var fallbackCfg = new StationConfig
+        {
+            Host = "",
+            StationName = station.StationName,
+            TimezoneOffset = station.TimezoneOffset,
+            EnableTimezoneCalc = false,
+            Destinations = new List<string>(),
+            Schedule = new List<ScheduleEntry>()
+        };
+
+        try
+        {
+            Directory.CreateDirectory(stationConfigRoot);
+            var json = JsonSerializer.Serialize(fallbackCfg, jsonOptions);
+            await File.WriteAllTextAsync(cfgFile, json);
+            log.Info("ONDEMAND", $"[FALLBACK] Created station config '{cfgFile}' from DB offset {station.TimezoneOffset}.");
+        }
+        catch (Exception ex)
+        {
+            log.Error("ONDEMAND", $"[FALLBACK] Could not persist fallback config '{cfgFile}': {ex.Message}");
+        }
+
+        return fallbackCfg;
     }
 }
 
