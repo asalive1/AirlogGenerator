@@ -33,6 +33,13 @@
     <UserSecretsId>daa467cc-d392-43f8-8b38-113590aab5e2</UserSecretsId>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <UseAppHost>true</UseAppHost>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="wwwroot\**\*.*" />
   </ItemGroup>
