@@ -5,7 +5,7 @@ COPY AirlogGenerator.csproj ./
 RUN dotnet restore AirlogGenerator.csproj
 
 COPY . ./
-RUN dotnet publish AirlogGenerator.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish AirlogGenerator.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
