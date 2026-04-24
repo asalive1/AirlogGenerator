@@ -21,13 +21,50 @@ namespace AirlogGenerator.Services
         {
             _configService = configService;
 
-            _logFolder = Path.Combine(AppContext.BaseDirectory, "LOG");
+            var logOverride = Environment.GetEnvironmentVariable("AG_LOG_PATH");
+            if (!string.IsNullOrWhiteSpace(logOverride))
+            {
+                _logFolder = logOverride;
+            }
+            else
+            {
+                var preferredFolder = Path.Combine(AppContext.BaseDirectory, "LOG");
+                if (CanWriteToDirectory(preferredFolder))
+                {
+                    _logFolder = preferredFolder;
+                }
+                else
+                {
+                    _logFolder = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                        "AirlogGenerator",
+                        "LOG"
+                    );
+                }
+            }
+
             Directory.CreateDirectory(_logFolder);
 
             _currentLogDate = DateTime.Now.Date;
             _currentLogFile = GetDailyLogFilePath(_currentLogDate);
 
             CleanupOldLogs();
+        }
+
+        private static bool CanWriteToDirectory(string path)
+        {
+            try
+            {
+                Directory.CreateDirectory(path);
+                var probeFile = Path.Combine(path, $".write-test-{Guid.NewGuid():N}.tmp");
+                File.WriteAllText(probeFile, "ok");
+                File.Delete(probeFile);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private LoggingConfig GetLoggingConfig()

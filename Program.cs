@@ -56,16 +56,35 @@ if (initialConfig.EnableWebUi)
     {
         options.ListenAnyIP(initialConfig.WebPort);
 
-        try
+        var httpsCertPath = Environment.GetEnvironmentVariable("AG_HTTPS_CERT_PATH");
+        var httpsCertPassword = Environment.GetEnvironmentVariable("AG_HTTPS_CERT_PASSWORD");
+
+        if (!string.IsNullOrWhiteSpace(httpsCertPath) && File.Exists(httpsCertPath))
         {
-            options.ListenAnyIP(initialConfig.WebPort + 1, listenOptions =>
+            try
             {
-                listenOptions.UseHttps();
-            });
+                options.ListenAnyIP(initialConfig.WebPort + 1, listenOptions =>
+                {
+                    if (string.IsNullOrWhiteSpace(httpsCertPassword))
+                    {
+                        listenOptions.UseHttps(httpsCertPath);
+                    }
+                    else
+                    {
+                        listenOptions.UseHttps(httpsCertPath, httpsCertPassword);
+                    }
+                });
+
+                Console.WriteLine($"[CONFIG] HTTPS enabled on port {initialConfig.WebPort + 1} using AG_HTTPS_CERT_PATH.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WARN] HTTPS could not be enabled from AG_HTTPS_CERT_PATH: {ex.Message}");
+            }
         }
-        catch (Exception ex)
+        else
         {
-            Console.WriteLine($"[WARN] HTTPS could not be enabled: {ex.Message}");
+            Console.WriteLine("[CONFIG] HTTPS disabled (no AG_HTTPS_CERT_PATH provided). HTTP remains enabled.");
         }
     });
 }
