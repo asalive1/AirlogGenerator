@@ -36,7 +36,9 @@
         }
 
         // ROTATOR RULE:
-        // playlist_cart != media_cart → rotator
+        // 1) playlist_cart != media_cart -> rotator
+        // 2) Some traffic providers reuse the same cart for shell/cut, but with
+        //    different titles. Treat those as rotators as well.
         public static bool IsRotator(AirLogRow row)
         {
             if (row == null)
@@ -45,6 +47,17 @@
             if (!string.IsNullOrWhiteSpace(row.PlaylistCart) &&
                 !string.IsNullOrWhiteSpace(row.MediaCart) &&
                 !string.Equals(row.PlaylistCart, row.MediaCart, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // Conservative same-cart rotator detection to avoid over-duplicating.
+            if (!string.IsNullOrWhiteSpace(row.PlaylistCart) &&
+                !string.IsNullOrWhiteSpace(row.MediaCart) &&
+                string.Equals(row.PlaylistCart, row.MediaCart, StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(row.PlaylistTitle) &&
+                !string.IsNullOrWhiteSpace(row.MediaTitle) &&
+                !string.Equals(row.PlaylistTitle.Trim(), row.MediaTitle.Trim(), StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
