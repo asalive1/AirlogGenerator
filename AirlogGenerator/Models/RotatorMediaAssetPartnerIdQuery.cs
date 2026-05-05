@@ -63,6 +63,7 @@ namespace AirlogGenerator.Models
                     EntryType = row.EntryType,
                     EntryDescription = row.EntryDescription,
                     PartnerId = row.PartnerId,
+                    PlaylistEntryId = row.PlaylistEntryId,
 
                     PlaylistCart = row.PlaylistCart,
                     PlaylistCategory = row.PlaylistCategory,
@@ -96,6 +97,7 @@ namespace AirlogGenerator.Models
                     EntryType = row.EntryType,
                     EntryDescription = row.EntryDescription,
                     PartnerId = row.PartnerId,
+                    PlaylistEntryId = row.PlaylistEntryId,
 
                     MediaCart = row.MediaCart,
                     MediaCategory = row.MediaCategory,
