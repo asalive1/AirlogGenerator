@@ -36,36 +36,20 @@
         }
 
         // ROTATOR RULE:
-        // If both playlist and media metadata exist and differ, treat as rotator.
-        // Some traffic providers reuse the same cart for shell+cut, so cart mismatch
-        // alone is not enough.
+        // playlist_cart != media_cart → rotator
         public static bool IsRotator(AirLogRow row)
         {
             if (row == null)
                 return false;
 
-            var hasPlaylistData =
-                !string.IsNullOrWhiteSpace(row.PlaylistCart) ||
-                !string.IsNullOrWhiteSpace(row.PlaylistTitle) ||
-                !string.IsNullOrWhiteSpace(row.PlaylistArtist) ||
-                !string.IsNullOrWhiteSpace(row.PlaylistCategory);
+            if (!string.IsNullOrWhiteSpace(row.PlaylistCart) &&
+                !string.IsNullOrWhiteSpace(row.MediaCart) &&
+                !string.Equals(row.PlaylistCart, row.MediaCart, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
 
-            var hasMediaData =
-                !string.IsNullOrWhiteSpace(row.MediaCart) ||
-                !string.IsNullOrWhiteSpace(row.MediaTitle) ||
-                !string.IsNullOrWhiteSpace(row.MediaArtist) ||
-                !string.IsNullOrWhiteSpace(row.MediaCategory);
-
-            if (!hasPlaylistData || !hasMediaData)
-                return false;
-
-            static bool Diff(string? a, string? b) =>
-                !string.Equals((a ?? string.Empty).Trim(), (b ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase);
-
-            return Diff(row.PlaylistCart, row.MediaCart)
-                || Diff(row.PlaylistTitle, row.MediaTitle)
-                || Diff(row.PlaylistArtist, row.MediaArtist)
-                || Diff(row.PlaylistCategory, row.MediaCategory);
+            return false;
         }
     }
 
