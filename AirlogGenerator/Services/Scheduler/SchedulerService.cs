@@ -1,7 +1,8 @@
 ﻿using System.Text.Json;
-using AirlogGenerator.Config;
+using System.IO;
+using System.Threading;
 using AirlogGenerator.Models;
-using AirlogGenerator.Services;
+using AirlogGenerator.Config;
 
 namespace AirlogGenerator.Services.Scheduler
 {
@@ -14,9 +15,11 @@ namespace AirlogGenerator.Services.Scheduler
 
         private readonly string _stationConfigRoot;
         private readonly JsonSerializerOptions _jsonOptions;
+        private readonly SemaphoreSlim _stateLock = new(1, 1);
+        private readonly string _stateFilePath = Path.Combine(AppContext.BaseDirectory, "CONFIG", "scheduler-state.json");
 
         private readonly Dictionary<string, DateTime> _lastRun = new();
-        private readonly Dictionary<string, string> _scheduleSignatures = new();   // ⭐ NEW
+        private readonly Dictionary<string, string> _scheduleSignatures = new();
 
         public SchedulerService(
             LogService log,
@@ -40,54 +43,56 @@ namespace AirlogGenerator.Services.Scheduler
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _log.Info("SCHEDULER", "SchedulerService started.");
-
-            bool inContinuousMode = false;
+            LoadSchedulerState(); // Load state on startup
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                try
-                {
-                    var cfg = _configService.Load();
-                    int interval = cfg.SchedulerIntervalMinutes;
+                DateTime now = DateTime.Now; // Capture once per cycle
+                await RunSchedulerCycle(now, stoppingToken);
 
-                    if (interval > 0)
-                        _log.Info("SCHEDULER", "Wake-up tick: checking for scheduled tasks...");
-
-                    if (interval <= 0 && !inContinuousMode)
-                    {
-                        _log.Info("SCHEDULER", "Entering continuous mode (interval=0). Checking every 1 second.");
-                        inContinuousMode = true;
-                    }
-                    else if (interval > 0 && inContinuousMode)
-                    {
-                        _log.Info("SCHEDULER", $"Leaving continuous mode. Resuming {interval}-minute interval.");
-                        inContinuousMode = false;
-                    }
-
-                    await RunSchedulerCycle(stoppingToken, inContinuousMode);
-                }
-                catch (Exception ex)
-                {
-                    _log.Error("SCHEDULER", $"Unhandled scheduler error: {ex.Message}");
-                }
-
-                var cfg2 = _configService.Load();
-                int interval2 = cfg2.SchedulerIntervalMinutes;
-
-                if (interval2 <= 0)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
-                }
-                else
-                {
-                    interval2 = Math.Clamp(interval2, 1, 120);
-                    await Task.Delay(TimeSpan.FromMinutes(interval2), stoppingToken);
-                }
+                var cfg = _configService.Load();
+                int interval = cfg.SchedulerIntervalMinutes;
+                await Task.Delay(interval <= 0 ? TimeSpan.FromSeconds(1) : TimeSpan.FromMinutes(interval), stoppingToken);
             }
         }
 
-        private async Task RunSchedulerCycle(CancellationToken token, bool continuousMode)
+        private void LoadSchedulerState()
+        {
+            if (!File.Exists(_stateFilePath)) return;
+
+            try
+            {
+                var json = File.ReadAllText(_stateFilePath);
+                var state = JsonSerializer.Deserialize<Dictionary<string, DateTime>>(json);
+                if (state != null)
+                    foreach (var kvp in state)
+                        _lastRun[kvp.Key] = kvp.Value;
+            }
+            catch (Exception ex)
+            {
+                _log.Error("SCHEDULER", $"Failed to load scheduler state: {ex.Message}");
+            }
+        }
+
+        private async Task SaveSchedulerState()
+        {
+            await _stateLock.WaitAsync();
+            try
+            {
+                var json = JsonSerializer.Serialize(_lastRun, _jsonOptions);
+                await File.WriteAllTextAsync(_stateFilePath, json);
+            }
+            catch (Exception ex)
+            {
+                _log.Error("SCHEDULER", $"Failed to save scheduler state: {ex.Message}");
+            }
+            finally
+            {
+                _stateLock.Release();
+            }
+        }
+
+        private async Task RunSchedulerCycle(DateTime now, CancellationToken token)
         {
             if (!Directory.Exists(_stationConfigRoot))
             {
@@ -102,11 +107,11 @@ namespace AirlogGenerator.Services.Scheduler
                 if (token.IsCancellationRequested)
                     return;
 
-                await ProcessStationConfig(file, token);
+                await ProcessStationConfig(file, now, token);
             }
         }
 
-        private async Task ProcessStationConfig(string filePath, CancellationToken token)
+        private async Task ProcessStationConfig(string filePath, DateTime now, CancellationToken token)
         {
             try
             {
@@ -127,7 +132,7 @@ namespace AirlogGenerator.Services.Scheduler
                     if (token.IsCancellationRequested)
                         return;
 
-                    await EvaluateSchedule(cfg, entry, index, token);
+                    await EvaluateSchedule(cfg, entry, index, now, token);
                 }
             }
             catch (Exception ex)
@@ -140,43 +145,34 @@ namespace AirlogGenerator.Services.Scheduler
             StationConfig station,
             ScheduleEntry entry,
             int index,
+            DateTime now,
             CancellationToken token)
         {
             string key = $"{station.StationName}:{index}";
-
-            // ⭐ NEW: compute signature
             string signature = JsonSerializer.Serialize(entry);
 
-            // ⭐ NEW: detect schedule changes
             if (!_scheduleSignatures.ContainsKey(key) ||
                 _scheduleSignatures[key] != signature)
             {
                 _scheduleSignatures[key] = signature;
                 _lastRun[key] = DateTime.MinValue;
-
-                _log.Info("SCHEDULER",
-                    $"Schedule changed for {station.StationName} entry {index}. Resetting last-run.");
+                _log.Info("SCHEDULER", $"Schedule changed for {station.StationName} entry {index}. Resetting last-run.");
             }
 
-            DateTime now = DateTime.Now;
             DateTime lastRun = _lastRun.ContainsKey(key) ? _lastRun[key] : DateTime.MinValue;
-
             bool shouldRun = ScheduleEvaluator.ShouldRun(entry, now, lastRun, _log);
 
-            if (!shouldRun)
-                return;
+            if (!shouldRun) return;
 
             var dates = DateRangeResolver.ResolveDates(entry, now, _log);
-
             foreach (var date in dates)
             {
-                if (token.IsCancellationRequested)
-                    return;
-
+                if (token.IsCancellationRequested) return;
                 await RunGenerationForDate(station, entry, date, token);
             }
 
             _lastRun[key] = now;
+            await SaveSchedulerState();
         }
 
         private async Task RunGenerationForDate(
@@ -191,13 +187,11 @@ namespace AirlogGenerator.Services.Scheduler
 
                 if (string.IsNullOrWhiteSpace(station.Host))
                 {
-                    _log.Error("SCHEDULER",
-                        $"Station {station.StationName} has NO host defined. Skipping.");
+                    _log.Error("SCHEDULER", $"Station {station.StationName} has NO host defined. Skipping.");
                     return;
                 }
 
                 _db.SetConnection(station.Host, "woar_server", "", "");
-
                 var rows = await strategy.ExecuteAsync(_db, station.StationName, date);
 
                 var lines = _formatter.GenerateLines(
@@ -229,8 +223,7 @@ namespace AirlogGenerator.Services.Scheduler
             }
             catch (Exception ex)
             {
-                _log.Error("SCHEDULER",
-                    $"Error generating AIR log for {station.StationName} on {date:yyyy-MM-dd}: {ex.Message}");
+                _log.Error("SCHEDULER", $"Failed to run generation for {station.StationName} on {date:yyyy-MM-dd}: {ex.Message}");
             }
         }
     }

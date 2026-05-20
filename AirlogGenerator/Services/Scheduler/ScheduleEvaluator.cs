@@ -42,12 +42,13 @@ namespace AirlogGenerator.Services.Scheduler
 
             if (!TimeSpan.TryParse(timeString, out var target))
             {
-                log.Error("SCHEDULER",
-                    $"Invalid time format '{timeString}'. Expected HH:mm.");
+                log.Error("SCHEDULER", $"Invalid time format '{timeString}'. Expected HH:mm.");
                 return false;
             }
 
-            return now.Hour == target.Hours && now.Minute == target.Minutes;
+            var targetTime = now.Date.Add(target);
+            var tolerance = TimeSpan.FromMinutes(2);
+            return now >= targetTime - tolerance && now <= targetTime + tolerance;
         }
 
         private static bool ShouldRunDaily(
