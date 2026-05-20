@@ -36,33 +36,26 @@
         }
 
         // ROTATOR RULE:
-        // 1) playlist_cart != media_cart -> rotator
-        // 2) Some traffic providers reuse the same cart for shell/cut, but with
-        //    different titles. Treat those as rotators as well.
+        // A rotator is identified by a category+cart pair mismatch between the
+        // playlist (container) entry and the media asset (selected cut).
+        // Category and cart are both required for identification because the same
+        // cart number can exist in different categories.
+        // Title differences alone are NOT sufficient — only category+cart uniquely
+        // identifies an asset in the automation system.
         public static bool IsRotator(AirLogRow row)
         {
             if (row == null)
                 return false;
 
-            if (!string.IsNullOrWhiteSpace(row.PlaylistCart) &&
-                !string.IsNullOrWhiteSpace(row.MediaCart) &&
-                !string.Equals(row.PlaylistCart, row.MediaCart, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
+            // Both sides must have a cart for comparison to be meaningful.
+            if (string.IsNullOrWhiteSpace(row.PlaylistCart) ||
+                string.IsNullOrWhiteSpace(row.MediaCart))
+                return false;
 
-            // Conservative same-cart rotator detection to avoid over-duplicating.
-            if (!string.IsNullOrWhiteSpace(row.PlaylistCart) &&
-                !string.IsNullOrWhiteSpace(row.MediaCart) &&
-                string.Equals(row.PlaylistCart, row.MediaCart, StringComparison.OrdinalIgnoreCase) &&
-                !string.IsNullOrWhiteSpace(row.PlaylistTitle) &&
-                !string.IsNullOrWhiteSpace(row.MediaTitle) &&
-                !string.Equals(row.PlaylistTitle.Trim(), row.MediaTitle.Trim(), StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
+            var playlistPair = $"{row.PlaylistCategory?.Trim()}|{row.PlaylistCart.Trim()}";
+            var mediaPair    = $"{row.MediaCategory?.Trim()}|{row.MediaCart.Trim()}";
 
-            return false;
+            return !string.Equals(playlistPair, mediaPair, StringComparison.OrdinalIgnoreCase);
         }
     }
 
